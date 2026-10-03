@@ -6,7 +6,7 @@ TaskForge is a deliberately realistic Go backend used to compare the developer e
 
 The application is a small Jira/Linear-style project-management system.
 
-The goal is NOT to determine a universal winner. Implement the same requirements three times and record:
+The goal is **NOT** to determine a universal winner. Implement the same requirements three times and record:
 
 - SQL required
 - handwritten Go required
@@ -25,7 +25,72 @@ Do not simplify requirements for any library.
 
 ---
 
-# 1. Repository / implementation boundary
+## Table of Contents
+
+- [1. Repository / Implementation Boundary](#1-repository--implementation-boundary)
+- [2. Domain](#2-domain)
+- [3. Database Schema](#3-database-schema)
+  - [3.1 organizations](#31-organizations)
+  - [3.2 users](#32-users)
+  - [3.3 teams](#33-teams)
+  - [3.4 team_members](#34-team_members)
+  - [3.5 projects](#35-projects)
+  - [3.6 issues](#36-issues)
+  - [3.7 labels](#37-labels)
+  - [3.8 issue_labels](#38-issue_labels)
+  - [3.9 comments](#39-comments)
+  - [3.10 audit_events](#310-audit_events)
+- [4. Required Indexes](#4-required-indexes)
+- [5. Seed Data](#5-seed-data)
+- [6. Repository Methods](#6-repository-methods)
+- [7. Exact SQL Requirements: Core Entities](#7-exact-sql-requirements-core-entities)
+  - [Organizations](#organizations)
+  - [Users](#users)
+  - [Teams](#teams)
+  - [Projects](#projects)
+- [8. Issues](#8-issues)
+  - [CreateIssue](#createissue)
+  - [GetIssueDetails](#getissuedetails)
+  - [ListProjectIssues](#listprojectissues)
+  - [CountProjectIssues](#countprojectissues)
+  - [SearchIssues](#searchissues)
+  - [GetIssueForUpdate](#getissueforupdate)
+  - [UpdateIssueStatus](#updateissuestatus)
+  - [AssignIssue](#assignissue)
+  - [DeleteIssue](#deleteissue)
+- [9. Labels](#9-labels)
+  - [CreateLabel](#createlabel)
+  - [AddLabelToIssue](#addlabeltoissue)
+  - [RemoveLabelFromIssue](#removelabelfromissue)
+  - [ListIssueLabels](#listissuelabels)
+  - [AddLabelsToIssue (Batch)](#addlabelstoissue-batch)
+- [10. Comments](#10-comments)
+  - [CreateComment](#createcomment)
+  - [ListIssueComments](#listissuecomments)
+- [11. Audit Events](#11-audit-events)
+  - [CreateAuditEvent](#createauditevent)
+  - [ListIssueActivity](#listissueactivity)
+- [12. Analytical Queries](#12-analytical-queries)
+  - [ProjectDashboard](#projectdashboard)
+  - [UserWorkload](#userworkload)
+- [13. Recursive CTE](#13-recursive-cte)
+- [14. Window Function](#14-window-function)
+- [15. Transaction: ChangeIssueStatus](#15-transaction-changeissuestatus)
+- [16. Transaction: CreateIssue](#16-transaction-createissue)
+- [17. Tenant Isolation](#17-tenant-isolation)
+- [18. Repository Contract Tests](#18-repository-contract-tests)
+- [19. Concurrency Test](#19-concurrency-test)
+- [20. Error Behavior](#20-error-behavior)
+- [21. Developer-Experience Experiment](#21-developer-experience-experiment)
+- [22. Required Comparison Matrix](#22-required-comparison-matrix)
+- [23. Implementation Order](#23-implementation-order)
+- [24. Definition of Done](#24-definition-of-done)
+- [25. AI-Agent Implementation Rules](#25-ai-agent-implementation-rules)
+- [26. Final Architecture](#26-final-architecture)
+
+---
+
+## 1. Repository / Implementation Boundary
 
 Use three independent Go modules:
 
@@ -39,13 +104,12 @@ taskforge/
 └── go.work
 ```
 
-Each implementation must use PostgreSQL and must independently implement the same domain behavior.
-
-Do not share persistence implementation code between the three modules.
+- Each implementation must use PostgreSQL and must independently implement the same domain behavior.
+- Do not share persistence implementation code between the three modules.
 
 ---
 
-# 2. Domain
+## 2. Domain
 
 TaskForge is a multi-tenant project management system.
 
@@ -69,9 +133,9 @@ There are exactly **10 database tables**.
 
 ---
 
-# 3. Database schema
+## 3. Database Schema
 
-## 3.1 organizations
+### 3.1 organizations
 
 ```sql
 CREATE TABLE organizations (
@@ -82,7 +146,7 @@ CREATE TABLE organizations (
 );
 ```
 
-## 3.2 users
+### 3.2 users
 
 ```sql
 CREATE TABLE users (
@@ -96,7 +160,7 @@ CREATE TABLE users (
 );
 ```
 
-## 3.3 teams
+### 3.3 teams
 
 ```sql
 CREATE TABLE teams (
@@ -109,7 +173,7 @@ CREATE TABLE teams (
 );
 ```
 
-## 3.4 team_members
+### 3.4 team_members
 
 ```sql
 CREATE TABLE team_members (
@@ -121,7 +185,7 @@ CREATE TABLE team_members (
 );
 ```
 
-## 3.5 projects
+### 3.5 projects
 
 ```sql
 CREATE TABLE projects (
@@ -136,14 +200,13 @@ CREATE TABLE projects (
 );
 ```
 
-Valid project status:
-
+Valid project status values:
 ```text
 active
 archived
 ```
 
-## 3.6 issues
+### 3.6 issues
 
 ```sql
 CREATE TABLE issues (
@@ -173,7 +236,7 @@ CREATE TABLE issues (
 );
 ```
 
-## 3.7 labels
+### 3.7 labels
 
 ```sql
 CREATE TABLE labels (
@@ -185,7 +248,7 @@ CREATE TABLE labels (
 );
 ```
 
-## 3.8 issue_labels
+### 3.8 issue_labels
 
 ```sql
 CREATE TABLE issue_labels (
@@ -195,7 +258,7 @@ CREATE TABLE issue_labels (
 );
 ```
 
-## 3.9 comments
+### 3.9 comments
 
 ```sql
 CREATE TABLE comments (
@@ -208,7 +271,7 @@ CREATE TABLE comments (
 );
 ```
 
-## 3.10 audit_events
+### 3.10 audit_events
 
 ```sql
 CREATE TABLE audit_events (
@@ -224,9 +287,9 @@ CREATE TABLE audit_events (
 
 ---
 
-# 4. Required indexes
+## 4. Required Indexes
 
-Create:
+Execute the following index creation statements:
 
 ```sql
 CREATE INDEX idx_users_organization_id ON users(organization_id);
@@ -245,13 +308,14 @@ CREATE INDEX idx_audit_events_org_created ON audit_events(organization_id, creat
 CREATE INDEX idx_audit_events_issue_created ON audit_events(issue_id, created_at);
 ```
 
-Do not add arbitrary indexes without documenting the reason.
+> [!IMPORTANT]
+> Do not add arbitrary indexes without documenting the specific query optimization reason.
 
 ---
 
-# 5. Seed data
+## 5. Seed Data
 
-Create deterministic seed data:
+Create deterministic seed data containing:
 
 ```text
 2 organizations
@@ -265,48 +329,45 @@ Create deterministic seed data:
 300+ audit events
 ```
 
-Seed data must include:
+Seed data must cover:
 
-- users in different organizations
-- users in multiple teams
-- projects with different issue counts
-- assigned and unassigned issues
-- overdue issues
-- completed issues
-- cancelled issues
-- parent/child issues
-- issues with multiple labels
-- issues without labels
-- issues with multiple comments
-- multiple audit-event types
+- Users in different organizations
+- Users in multiple teams
+- Projects with varying issue counts
+- Assigned and unassigned issues
+- Overdue issues
+- Completed issues
+- Cancelled issues
+- Parent/child issue hierarchies
+- Issues with multiple labels
+- Issues without labels
+- Issues with multiple comments
+- Multiple audit-event types
 
-Use fixed UUIDs so integration tests can refer to known records.
+> [!TIP]
+> Use fixed, deterministic UUIDs so integration and contract tests can refer to known records reliably.
 
 ---
 
-# 6. Repository methods
+## 6. Repository Methods
 
-Do NOT create generic CRUD repositories.
+> [!CAUTION]
+> Do NOT create generic CRUD repositories. Expose domain- and business-oriented persistence operations.
 
-Expose business-oriented persistence operations.
-
-## Organizations
-
+### Organizations
 ```text
 CreateOrganization
 GetOrganization
 ```
 
-## Users
-
+### Users
 ```text
 CreateUser
 GetUser
 ListUsersByOrganization
 ```
 
-## Teams
-
+### Teams
 ```text
 CreateTeam
 AddTeamMember
@@ -314,16 +375,14 @@ RemoveTeamMember
 ListTeamMembers
 ```
 
-## Projects
-
+### Projects
 ```text
 CreateProject
 GetProject
 ListProjectsByTeam
 ```
 
-## Issues
-
+### Issues
 ```text
 CreateIssue
 GetIssueDetails
@@ -337,8 +396,7 @@ DeleteIssue
 GetIssueTree
 ```
 
-## Labels
-
+### Labels
 ```text
 CreateLabel
 AddLabelToIssue
@@ -347,22 +405,19 @@ ListIssueLabels
 AddLabelsToIssue
 ```
 
-## Comments
-
+### Comments
 ```text
 CreateComment
 ListIssueComments
 ```
 
-## Audit
-
+### Audit
 ```text
 CreateAuditEvent
 ListIssueActivity
 ```
 
-Additional analytical queries:
-
+### Additional Analytical Queries
 ```text
 ProjectDashboard
 UserWorkload
@@ -371,22 +426,20 @@ RecentIssueRank
 
 ---
 
-# 7. Exact SQL requirements
+## 7. Exact SQL Requirements: Core Entities
 
-The following query semantics are fixed. The SQL syntax MAY differ between implementations where the library requires it, but the resulting behavior must be equivalent.
+The following query semantics are fixed. SQL syntax MAY differ slightly between libraries where an abstraction demands it, but the resulting behavior and result sets must remain completely equivalent.
 
-## Organizations
+### Organizations
 
-### CreateOrganization
-
+#### CreateOrganization
 ```sql
 INSERT INTO organizations (id, name, slug)
 VALUES ($1, $2, $3)
 RETURNING *;
 ```
 
-### GetOrganization
-
+#### GetOrganization
 ```sql
 SELECT *
 FROM organizations
@@ -395,10 +448,9 @@ WHERE id = $1;
 
 ---
 
-## Users
+### Users
 
-### CreateUser
-
+#### CreateUser
 ```sql
 INSERT INTO users (
     id, organization_id, name, email, avatar_url
@@ -407,16 +459,14 @@ VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 ```
 
-### GetUser
-
+#### GetUser
 ```sql
 SELECT *
 FROM users
 WHERE id = $1;
 ```
 
-### ListUsersByOrganization
-
+#### ListUsersByOrganization
 ```sql
 SELECT *
 FROM users
@@ -426,20 +476,17 @@ ORDER BY created_at DESC;
 
 ---
 
-## Teams
+### Teams
 
-### CreateTeam
-
+#### CreateTeam
 ```sql
 INSERT INTO teams (id, organization_id, name, key)
 VALUES ($1, $2, $3, $4)
 RETURNING *;
 ```
 
-### AddTeamMember
-
+#### AddTeamMember
 Must use upsert:
-
 ```sql
 INSERT INTO team_members (team_id, user_id, role)
 VALUES ($1, $2, $3)
@@ -447,17 +494,14 @@ ON CONFLICT (team_id, user_id)
 DO UPDATE SET role = EXCLUDED.role;
 ```
 
-### RemoveTeamMember
-
+#### RemoveTeamMember
 ```sql
 DELETE FROM team_members
 WHERE team_id = $1 AND user_id = $2;
 ```
 
-### ListTeamMembers
-
-Required JOIN:
-
+#### ListTeamMembers
+Required `JOIN`:
 ```sql
 SELECT
     u.id,
@@ -473,10 +517,9 @@ ORDER BY u.name;
 
 ---
 
-## Projects
+### Projects
 
-### CreateProject
-
+#### CreateProject
 ```sql
 INSERT INTO projects (
     id, team_id, name, key, description, status
@@ -485,16 +528,14 @@ VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 ```
 
-### GetProject
-
+#### GetProject
 ```sql
 SELECT *
 FROM projects
 WHERE id = $1;
 ```
 
-### ListProjectsByTeam
-
+#### ListProjectsByTeam
 ```sql
 SELECT *
 FROM projects
@@ -504,9 +545,9 @@ ORDER BY created_at DESC;
 
 ---
 
-# 8. Issues
+## 8. Issues
 
-## CreateIssue
+### CreateIssue
 
 ```sql
 INSERT INTO issues (
@@ -529,9 +570,9 @@ VALUES (
 RETURNING *;
 ```
 
-## GetIssueDetails
+### GetIssueDetails
 
-Required JOIN query:
+Required `JOIN` query:
 
 ```sql
 SELECT
@@ -569,9 +610,10 @@ LEFT JOIN users assignee ON assignee.id = i.assignee_id
 WHERE i.id = $1;
 ```
 
-Do not create N+1 queries.
+> [!WARNING]
+> Do not generate N+1 queries. All project, team, creator, and assignee data must be retrieved in a single statement.
 
-## ListProjectIssues
+### ListProjectIssues
 
 ```sql
 SELECT
@@ -602,7 +644,6 @@ LIMIT $2 OFFSET $3;
 ```
 
 This intentionally exercises:
-
 ```text
 JOIN
 LEFT JOIN
@@ -614,7 +655,7 @@ LIMIT
 OFFSET
 ```
 
-## CountProjectIssues
+### CountProjectIssues
 
 ```sql
 SELECT COUNT(*)
@@ -622,10 +663,9 @@ FROM issues
 WHERE project_id = $1;
 ```
 
-## SearchIssues
+### SearchIssues
 
 Inputs:
-
 ```text
 organization_id
 search_term
@@ -633,7 +673,7 @@ limit
 offset
 ```
 
-Initial implementation uses `ILIKE`.
+Initial implementation uses `ILIKE`:
 
 ```sql
 SELECT
@@ -660,7 +700,7 @@ ORDER BY i.updated_at DESC
 LIMIT $3 OFFSET $4;
 ```
 
-## GetIssueForUpdate
+### GetIssueForUpdate
 
 Must use row locking:
 
@@ -671,9 +711,10 @@ WHERE id = $1
 FOR UPDATE;
 ```
 
-This query MUST run inside a transaction.
+> [!IMPORTANT]
+> This query **MUST** run inside an active database transaction.
 
-## UpdateIssueStatus
+### UpdateIssueStatus
 
 ```sql
 UPDATE issues
@@ -684,7 +725,7 @@ WHERE id = $1
 RETURNING *;
 ```
 
-## AssignIssue
+### AssignIssue
 
 ```sql
 UPDATE issues
@@ -695,7 +736,7 @@ WHERE id = $1
 RETURNING *;
 ```
 
-## DeleteIssue
+### DeleteIssue
 
 ```sql
 DELETE FROM issues
@@ -704,9 +745,9 @@ WHERE id = $1;
 
 ---
 
-# 9. Labels
+## 9. Labels
 
-## CreateLabel
+### CreateLabel
 
 ```sql
 INSERT INTO labels (
@@ -716,7 +757,7 @@ VALUES ($1, $2, $3, $4)
 RETURNING *;
 ```
 
-## AddLabelToIssue
+### AddLabelToIssue
 
 ```sql
 INSERT INTO issue_labels (issue_id, label_id)
@@ -725,7 +766,7 @@ ON CONFLICT (issue_id, label_id)
 DO NOTHING;
 ```
 
-## RemoveLabelFromIssue
+### RemoveLabelFromIssue
 
 ```sql
 DELETE FROM issue_labels
@@ -733,7 +774,7 @@ WHERE issue_id = $1
   AND label_id = $2;
 ```
 
-## ListIssueLabels
+### ListIssueLabels
 
 ```sql
 SELECT
@@ -746,29 +787,28 @@ WHERE il.issue_id = $1
 ORDER BY l.name;
 ```
 
-## AddLabelsToIssue
+### AddLabelsToIssue (Batch)
 
 Input:
-
 ```text
 issue_id
 label_ids[]
 ```
 
 Requirements:
-
-- one transaction
-- bulk insert
+- One transaction
+- Bulk insert
 - `ON CONFLICT DO NOTHING`
-- never one transaction per label
+- Never execute one transaction or one query per label
 
-The implementation should use the most idiomatic batch operation available in the selected library.
+> [!TIP]
+> The implementation should use the most idiomatic batch operation available in the chosen library (e.g. unnesting slices, bulk insert builders, or batch exec).
 
 ---
 
-# 10. Comments
+## 10. Comments
 
-## CreateComment
+### CreateComment
 
 ```sql
 INSERT INTO comments (
@@ -778,7 +818,7 @@ VALUES ($1, $2, $3, $4)
 RETURNING *;
 ```
 
-## ListIssueComments
+### ListIssueComments
 
 ```sql
 SELECT
@@ -797,9 +837,9 @@ ORDER BY c.created_at ASC;
 
 ---
 
-# 11. Audit events
+## 11. Audit Events
 
-## CreateAuditEvent
+### CreateAuditEvent
 
 ```sql
 INSERT INTO audit_events (
@@ -815,7 +855,7 @@ RETURNING *;
 
 `metadata` must be represented as structured JSON/JSONB.
 
-## ListIssueActivity
+### ListIssueActivity
 
 ```sql
 SELECT
@@ -835,14 +875,13 @@ LIMIT $2 OFFSET $3;
 
 ---
 
-# 12. Analytical queries
+## 12. Analytical Queries
 
-These are deliberately included to test non-CRUD database work.
+These queries are deliberately included to test non-trivial analytical database workloads beyond standard CRUD.
 
-## ProjectDashboard
+### ProjectDashboard
 
-Return:
-
+Return fields:
 ```text
 total_issues
 backlog_count
@@ -855,7 +894,6 @@ completed_estimate_points
 ```
 
 Required PostgreSQL concepts:
-
 ```text
 COUNT
 SUM
@@ -863,7 +901,7 @@ FILTER
 COALESCE
 ```
 
-Target:
+Target SQL:
 
 ```sql
 SELECT
@@ -888,10 +926,9 @@ WHERE project_id = $1;
 
 ---
 
-## UserWorkload
+### UserWorkload
 
-Return:
-
+Return aggregate summary:
 ```text
 total_assigned
 open_count
@@ -902,7 +939,6 @@ overdue_count
 ```
 
 Also return a per-project breakdown:
-
 ```text
 project_id
 project_name
@@ -913,34 +949,67 @@ completed_points
 ```
 
 Requirements:
+- Assigned to the requested user (`assignee_id = $1`)
+- Optional date range filtering
+- Overdue criteria: `due_date < current_date` and `status NOT IN ('done', 'cancelled')`
+- Use `JOIN`
+- Use `COUNT` and `SUM`
+- Use `GROUP BY`
+- Use `FILTER` or `CASE`
 
-- assigned to the requested user
-- optional date range
-- overdue = due_date < current_date and status not in done/cancelled
-- use JOIN
-- use COUNT/SUM
-- use GROUP BY
-- use FILTER or CASE
+Target SQL:
+
+```sql
+-- Aggregate Summary
+SELECT
+    COUNT(*) AS total_assigned,
+    COUNT(*) FILTER (WHERE status NOT IN ('done', 'cancelled')) AS open_count,
+    COUNT(*) FILTER (WHERE status = 'done') AS completed_count,
+    COALESCE(SUM(estimate_points), 0) AS total_estimate_points,
+    COALESCE(SUM(estimate_points) FILTER (WHERE status = 'done'), 0) AS completed_estimate_points,
+    COUNT(*) FILTER (
+        WHERE due_date < CURRENT_DATE
+          AND status NOT IN ('done', 'cancelled')
+    ) AS overdue_count
+FROM issues
+WHERE assignee_id = $1
+  AND ($2::TIMESTAMPTZ IS NULL OR created_at >= $2)
+  AND ($3::TIMESTAMPTZ IS NULL OR created_at <= $3);
+
+-- Per-Project Breakdown
+SELECT
+    p.id AS project_id,
+    p.name AS project_name,
+    COUNT(*) FILTER (WHERE i.status NOT IN ('done', 'cancelled')) AS open_count,
+    COUNT(*) FILTER (WHERE i.status = 'done') AS completed_count,
+    COALESCE(SUM(i.estimate_points), 0) AS total_points,
+    COALESCE(SUM(i.estimate_points) FILTER (WHERE i.status = 'done'), 0) AS completed_points
+FROM issues i
+JOIN projects p ON p.id = i.project_id
+WHERE i.assignee_id = $1
+  AND ($2::TIMESTAMPTZ IS NULL OR i.created_at >= $2)
+  AND ($3::TIMESTAMPTZ IS NULL OR i.created_at <= $3)
+GROUP BY p.id, p.name
+ORDER BY p.name;
+```
 
 ---
 
-# 13. Recursive CTE
+## 13. Recursive CTE
 
 Implement:
-
 ```text
 GetIssueTree(project_id)
 ```
 
-Issues have:
-
+Issues have self-referential relationships:
 ```text
 parent_issue_id → issues.id
 ```
 
-Use PostgreSQL recursive CTE.
+Use a PostgreSQL recursive Common Table Expression (CTE).
 
-Target:
+Target SQL:
 
 ```sql
 WITH RECURSIVE issue_tree AS (
@@ -973,16 +1042,14 @@ FROM issue_tree
 ORDER BY depth, title;
 ```
 
-Do NOT replace this with application-side recursion.
-
-The purpose is specifically to compare how each database abstraction handles recursive PostgreSQL SQL.
+> [!CAUTION]
+> Do **NOT** replace this with application-side recursion. The purpose is specifically to compare how each database abstraction handles recursive PostgreSQL SQL.
 
 ---
 
-# 14. Window function
+## 14. Window Function
 
 Implement:
-
 ```text
 RecentIssueRank
 ```
@@ -990,7 +1057,6 @@ RecentIssueRank
 Return the three most recently updated issues per project.
 
 Required SQL concept:
-
 ```sql
 ROW_NUMBER() OVER (
     PARTITION BY project_id
@@ -998,7 +1064,7 @@ ROW_NUMBER() OVER (
 )
 ```
 
-Target:
+Target SQL:
 
 ```sql
 WITH ranked AS (
@@ -1017,12 +1083,11 @@ WHERE row_num <= 3;
 
 ---
 
-# 15. Transaction: ChangeIssueStatus
+## 15. Transaction: ChangeIssueStatus
 
-This is a business operation, not just one UPDATE query.
+This is a business operation, not just a standalone UPDATE statement.
 
 Input:
-
 ```text
 issue_id
 actor_id
@@ -1030,7 +1095,6 @@ new_status
 ```
 
 Required sequence:
-
 ```text
 BEGIN
 
@@ -1049,8 +1113,7 @@ INSERT audit event
 COMMIT
 ```
 
-Audit event:
-
+Audit event specification:
 ```text
 event_type = issue.status_changed
 metadata = {
@@ -1060,21 +1123,19 @@ metadata = {
 ```
 
 If anything fails:
-
 ```text
 ROLLBACK
 ```
 
-No partial state may remain.
+No partial state may remain in the database.
 
 ---
 
-# 16. Transaction: CreateIssue
+## 16. Transaction: CreateIssue
 
 Creating an issue with labels must be atomic.
 
 Required sequence:
-
 ```text
 BEGIN
 
@@ -1099,12 +1160,11 @@ If label insertion or audit insertion fails, the issue must not exist.
 
 ---
 
-# 17. Tenant isolation
+## 17. Tenant Isolation
 
-This is mandatory.
+Tenant isolation is mandatory.
 
-Organization A must never retrieve Organization B's:
-
+Organization A must never retrieve Organization B's data across:
 ```text
 users
 teams
@@ -1114,17 +1174,15 @@ labels
 audit events
 ```
 
-Test cases must include cross-tenant IDs.
-
-Search must also enforce tenant boundaries.
-
-Where appropriate, establish ownership through joins rather than trusting a caller-supplied organization ID.
+- Test cases must include cross-tenant IDs.
+- Search queries must enforce organization boundaries.
+- Where appropriate, establish ownership through joins rather than trusting a caller-supplied organization ID.
 
 ---
 
-# 18. Repository contract tests
+## 18. Repository Contract Tests
 
-The same logical test suite must eventually run against all three implementations.
+The same logical test suite must run against all three implementations (`sqlc`, `Bun`, `Ent`).
 
 Required tests include:
 
@@ -1178,14 +1236,13 @@ ConcurrentStatusUpdate
 
 ---
 
-# 19. Concurrency test
+## 19. Concurrency Test
 
 Run two concurrent status changes against the same issue.
 
 The implementation must demonstrate that the `FOR UPDATE` transaction prevents inconsistent state.
 
-Test:
-
+Test scenario:
 ```text
 Transaction A:
     SELECT issue FOR UPDATE
@@ -1194,16 +1251,16 @@ Transaction A:
     COMMIT
 
 Transaction B:
-    attempts same issue
+    attempts update on same issue concurrently
 ```
 
-Verify the final issue state and audit history are consistent.
+Verify that the final issue state and audit log history are strictly consistent without race conditions.
 
 ---
 
-# 20. Error behavior
+## 20. Error Behavior
 
-The repository/service boundary must distinguish:
+The repository/service boundary must distinguish the following error classes:
 
 ```text
 not found
@@ -1212,18 +1269,15 @@ database failure
 transaction failure
 ```
 
-Exact error types may differ between sqlc/Bun/Ent.
-
-Behavior must be equivalent.
+Exact error types may differ between `sqlc`, `Bun`, and `Ent`, but the classified behavior must be equivalent.
 
 ---
 
-# 21. Developer-experience experiment
+## 21. Developer-Experience Experiment
 
-For every implementation maintain a `PRODUCTIVITY.md`.
+For every implementation, maintain a `PRODUCTIVITY.md`.
 
 Record:
-
 ```text
 setup time
 dependency count
@@ -1237,8 +1291,7 @@ time per migration
 time debugging a failed query
 ```
 
-For every difficult operation record:
-
+For every difficult operation, record:
 ```text
 Requirement
 Implementation
@@ -1252,44 +1305,42 @@ How good were runtime errors?
 How easy was IDE navigation?
 ```
 
-Do NOT assign an overall numeric winner.
-
-The objective is evidence-based comparison.
+> [!NOTE]
+> Do NOT assign an overall numeric winner. The objective is evidence-based developer experience comparison.
 
 ---
 
-# 22. Required comparison matrix
+## 22. Required Comparison Matrix
 
 Every implementation must support:
 
 | Capability | sqlc | Bun | Ent |
-|---|---:|---:|---:|
+|:---|:---:|:---:|:---:|
 | Basic CRUD | ✓ | ✓ | ✓ |
 | JOIN | ✓ | ✓ | ✓ |
 | LEFT JOIN | ✓ | ✓ | ✓ |
-| N:M | ✓ | ✓ | ✓ |
+| N:M Relationships | ✓ | ✓ | ✓ |
 | Aggregation | ✓ | ✓ | ✓ |
-| Dynamic filters | ✓ | ✓ | ✓ |
+| Dynamic Filters | ✓ | ✓ | ✓ |
 | Pagination | ✓ | ✓ | ✓ |
-| Transaction | ✓ | ✓ | ✓ |
-| Row locking | ✓ | ✓ | ✓ |
-| Upsert | ✓ | ✓ | ✓ |
-| Batch insert | ✓ | ✓ | ✓ |
-| JSONB | ✓ | ✓ | ✓ |
+| Transactions | ✓ | ✓ | ✓ |
+| Row Locking (`FOR UPDATE`) | ✓ | ✓ | ✓ |
+| Upsert (`ON CONFLICT`) | ✓ | ✓ | ✓ |
+| Batch Insert | ✓ | ✓ | ✓ |
+| JSONB Support | ✓ | ✓ | ✓ |
 | Recursive CTE | ✓ | ✓ | ✓ |
-| Window function | ✓ | ✓ | ✓ |
-| Concurrent update | ✓ | ✓ | ✓ |
+| Window Functions | ✓ | ✓ | ✓ |
+| Concurrent Update Testing | ✓ | ✓ | ✓ |
 
-The checkmarks describe required functionality, NOT an assessment of ease.
+*The checkmarks describe required functionality to be tested, NOT an assessment of ease.*
 
 ---
 
-# 23. Implementation order
+## 23. Implementation Order
 
-Do not implement everything at once.
+Do not implement everything at once. Follow this phased progression:
 
-## Phase 1 — Foundation
-
+### Phase 1 — Foundation
 ```text
 Organization
 User
@@ -1297,8 +1348,7 @@ Team
 Project
 ```
 
-## Phase 2 — Issues
-
+### Phase 2 — Issues
 ```text
 CreateIssue
 GetIssueDetails
@@ -1306,8 +1356,7 @@ DeleteIssue
 AssignIssue
 ```
 
-## Phase 3 — Relationships and aggregation
-
+### Phase 3 — Relationships and Aggregation
 ```text
 ListProjectIssues
 CountProjectIssues
@@ -1315,8 +1364,7 @@ ListIssueLabels
 ListIssueComments
 ```
 
-## Phase 4 — Transactions
-
+### Phase 4 — Transactions
 ```text
 GetIssueForUpdate
 UpdateIssueStatus
@@ -1324,14 +1372,12 @@ CreateAuditEvent
 ListIssueActivity
 ```
 
-## Phase 5 — Search
-
+### Phase 5 — Search
 ```text
 SearchIssues
 ```
 
-## Phase 6 — PostgreSQL-specific queries
-
+### Phase 6 — PostgreSQL-Specific Queries
 ```text
 ProjectDashboard
 UserWorkload
@@ -1339,14 +1385,12 @@ IssueTree
 RecentIssueRank
 ```
 
-## Phase 7 — Batch
-
+### Phase 7 — Batch
 ```text
 AddLabelsToIssue
 ```
 
-## Phase 8 — Contract/integration tests
-
+### Phase 8 — Contract & Integration Tests
 ```text
 Tenant isolation
 Rollback
@@ -1354,61 +1398,58 @@ Concurrency
 All repository methods
 ```
 
-Only after sqlc is complete should Bun implement the same requirements.
-
-Only after Bun is complete should Ent implement the same requirements.
+> [!IMPORTANT]
+> Sequence rule: Only after **sqlc** is complete should **Bun** implement the same requirements. Only after Bun is complete should **Ent** implement the same requirements.
 
 ---
 
-# 24. Definition of done
+## 24. Definition of Done
 
 An implementation is complete only when:
 
 ```text
-✓ migrations work from an empty PostgreSQL database
-✓ seed data is deterministic
-✓ generated code works
-✓ all repository methods exist
-✓ all required SQL behavior exists
-✓ transactions work
-✓ rollback works
-✓ tenant isolation works
-✓ recursive CTE works
-✓ window function works
+✓ Migrations run clean from an empty PostgreSQL database
+✓ Seed data is deterministic
+✓ Generated code compiles and works
+✓ All repository methods exist
+✓ All required SQL behavior exists
+✓ Transactions work
+✓ Rollback works
+✓ Tenant isolation works
+✓ Recursive CTE works
+✓ Window function works
 ✓ JSONB works
-✓ upsert works
-✓ batch operations work
-✓ integration tests pass
-✓ concurrency test passes
+✓ Upsert works
+✓ Batch operations work
+✓ Integration tests pass
+✓ Concurrency test passes
 ```
 
 ---
 
-# 25. AI-agent implementation rule
+## 25. AI-Agent Implementation Rules
 
-The coding agent implementing this specification must NOT:
+The coding agent implementing this specification must **NOT**:
 
-- redesign the schema
-- remove tables
-- simplify relationships
-- remove PostgreSQL-specific queries
-- replace recursive SQL with application-side recursion
-- introduce another ORM
-- implement Fiber or Go kit yet
-- implement Kubernetes yet
-- change transaction boundaries
-- replace the required business-oriented repository methods with generic CRUD
-- optimize away a deliberately included query because another abstraction makes it easier
+- Redesign the schema
+- Remove or rename tables
+- Simplify relationships
+- Remove PostgreSQL-specific queries
+- Replace recursive SQL with application-side recursion
+- Introduce another ORM
+- Implement Fiber or Go kit yet (focus on database DX first)
+- Implement Kubernetes yet
+- Change transaction boundaries
+- Replace the required business-oriented repository methods with generic CRUD
+- Optimize away a deliberately included query because another abstraction makes it easier
 
-The purpose of the project is to expose the actual developer experience of the selected database library.
-
-Implement the requirements faithfully.
+The purpose of the project is to expose the actual developer experience of the selected database library. Implement the requirements faithfully.
 
 ---
 
-# 26. Final architecture
+## 26. Final Architecture
 
-After the database experiment:
+Post-database experiment system architecture:
 
 ```text
                     TaskForge API
