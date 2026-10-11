@@ -29,6 +29,7 @@ func (s *OrganizationService) CreateOrganizationWithName(ctx context.Context, na
 	return s.repo.Create(ctx, org)
 }
 
+// GetOrganizationByID will be used to fetch the organization model from DB by its ID
 func (s *OrganizationService) GetOrganizationByID(ctx context.Context, id uuid.UUID) (*models.Organization, error) {
 	return s.repo.GetByID(ctx, id)
 }
