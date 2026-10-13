@@ -11,12 +11,15 @@ import (
 	"github.com/siddharth-kulshrestha/taskforge/sqlc/repository"
 )
 
+const CONN_STR1 = "postgres://taskforge@localhost:5432/taskforge?sslmode=disable"
+const CONN_STR2 = "postgres://taskforge:taskforge@localhost:5432/taskforge?sslmode=disable"
+
 func main() {
 	fmt.Println("starting the execution of Task forge....")
 
 	// SQL Connection
 	ctx := context.Background()
-	connStr := "postgres://taskforge:taskforge@localhost:5432/taskforge?sslmode=disable"
+	connStr := CONN_STR1
 
 	pool, err := pgxpool.New(ctx, connStr)
 	if err != nil {

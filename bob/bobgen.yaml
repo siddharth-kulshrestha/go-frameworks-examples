@@ -1,0 +1,17 @@
+psql:
+  schemas:
+    - public
+  driver: github.com/jackc/pgx/v5/stdlib
+
+plugins_preset: all
+
+plugins:
+  models:
+    pkgname: models
+    destination: models
+  factory:
+    pkgname: factory
+    destination: factory
+  queries:
+    pkgname: queries
+    destination: queries

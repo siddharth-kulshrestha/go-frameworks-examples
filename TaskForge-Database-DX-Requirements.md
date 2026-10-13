@@ -201,6 +201,7 @@ CREATE TABLE projects (
 ```
 
 Valid project status values:
+
 ```text
 active
 archived
@@ -355,12 +356,14 @@ Seed data must cover:
 > Do NOT create generic CRUD repositories. Expose domain- and business-oriented persistence operations.
 
 ### Organizations
+
 ```text
 CreateOrganization
 GetOrganization
 ```
 
 ### Users
+
 ```text
 CreateUser
 GetUser
@@ -368,6 +371,7 @@ ListUsersByOrganization
 ```
 
 ### Teams
+
 ```text
 CreateTeam
 AddTeamMember
@@ -376,6 +380,7 @@ ListTeamMembers
 ```
 
 ### Projects
+
 ```text
 CreateProject
 GetProject
@@ -383,6 +388,7 @@ ListProjectsByTeam
 ```
 
 ### Issues
+
 ```text
 CreateIssue
 GetIssueDetails
@@ -397,6 +403,7 @@ GetIssueTree
 ```
 
 ### Labels
+
 ```text
 CreateLabel
 AddLabelToIssue
@@ -406,18 +413,21 @@ AddLabelsToIssue
 ```
 
 ### Comments
+
 ```text
 CreateComment
 ListIssueComments
 ```
 
 ### Audit
+
 ```text
 CreateAuditEvent
 ListIssueActivity
 ```
 
 ### Additional Analytical Queries
+
 ```text
 ProjectDashboard
 UserWorkload
@@ -433,6 +443,7 @@ The following query semantics are fixed. SQL syntax MAY differ slightly between 
 ### Organizations
 
 #### CreateOrganization
+
 ```sql
 INSERT INTO organizations (id, name, slug)
 VALUES ($1, $2, $3)
@@ -440,6 +451,7 @@ RETURNING *;
 ```
 
 #### GetOrganization
+
 ```sql
 SELECT *
 FROM organizations
@@ -451,6 +463,7 @@ WHERE id = $1;
 ### Users
 
 #### CreateUser
+
 ```sql
 INSERT INTO users (
     id, organization_id, name, email, avatar_url
@@ -460,6 +473,7 @@ RETURNING *;
 ```
 
 #### GetUser
+
 ```sql
 SELECT *
 FROM users
@@ -467,6 +481,7 @@ WHERE id = $1;
 ```
 
 #### ListUsersByOrganization
+
 ```sql
 SELECT *
 FROM users
@@ -479,6 +494,7 @@ ORDER BY created_at DESC;
 ### Teams
 
 #### CreateTeam
+
 ```sql
 INSERT INTO teams (id, organization_id, name, key)
 VALUES ($1, $2, $3, $4)
@@ -486,7 +502,9 @@ RETURNING *;
 ```
 
 #### AddTeamMember
+
 Must use upsert:
+
 ```sql
 INSERT INTO team_members (team_id, user_id, role)
 VALUES ($1, $2, $3)
@@ -495,13 +513,16 @@ DO UPDATE SET role = EXCLUDED.role;
 ```
 
 #### RemoveTeamMember
+
 ```sql
 DELETE FROM team_members
 WHERE team_id = $1 AND user_id = $2;
 ```
 
 #### ListTeamMembers
+
 Required `JOIN`:
+
 ```sql
 SELECT
     u.id,
@@ -520,6 +541,7 @@ ORDER BY u.name;
 ### Projects
 
 #### CreateProject
+
 ```sql
 INSERT INTO projects (
     id, team_id, name, key, description, status
@@ -529,6 +551,7 @@ RETURNING *;
 ```
 
 #### GetProject
+
 ```sql
 SELECT *
 FROM projects
@@ -536,6 +559,7 @@ WHERE id = $1;
 ```
 
 #### ListProjectsByTeam
+
 ```sql
 SELECT *
 FROM projects
@@ -644,6 +668,7 @@ LIMIT $2 OFFSET $3;
 ```
 
 This intentionally exercises:
+
 ```text
 JOIN
 LEFT JOIN
@@ -666,6 +691,7 @@ WHERE project_id = $1;
 ### SearchIssues
 
 Inputs:
+
 ```text
 organization_id
 search_term
@@ -790,12 +816,14 @@ ORDER BY l.name;
 ### AddLabelsToIssue (Batch)
 
 Input:
+
 ```text
 issue_id
 label_ids[]
 ```
 
 Requirements:
+
 - One transaction
 - Bulk insert
 - `ON CONFLICT DO NOTHING`
@@ -882,6 +910,7 @@ These queries are deliberately included to test non-trivial analytical database 
 ### ProjectDashboard
 
 Return fields:
+
 ```text
 total_issues
 backlog_count
@@ -894,6 +923,7 @@ completed_estimate_points
 ```
 
 Required PostgreSQL concepts:
+
 ```text
 COUNT
 SUM
@@ -929,6 +959,7 @@ WHERE project_id = $1;
 ### UserWorkload
 
 Return aggregate summary:
+
 ```text
 total_assigned
 open_count
@@ -939,6 +970,7 @@ overdue_count
 ```
 
 Also return a per-project breakdown:
+
 ```text
 project_id
 project_name
@@ -949,6 +981,7 @@ completed_points
 ```
 
 Requirements:
+
 - Assigned to the requested user (`assignee_id = $1`)
 - Optional date range filtering
 - Overdue criteria: `due_date < current_date` and `status NOT IN ('done', 'cancelled')`
@@ -998,11 +1031,13 @@ ORDER BY p.name;
 ## 13. Recursive CTE
 
 Implement:
+
 ```text
 GetIssueTree(project_id)
 ```
 
 Issues have self-referential relationships:
+
 ```text
 parent_issue_id → issues.id
 ```
@@ -1050,6 +1085,7 @@ ORDER BY depth, title;
 ## 14. Window Function
 
 Implement:
+
 ```text
 RecentIssueRank
 ```
@@ -1057,6 +1093,7 @@ RecentIssueRank
 Return the three most recently updated issues per project.
 
 Required SQL concept:
+
 ```sql
 ROW_NUMBER() OVER (
     PARTITION BY project_id
@@ -1088,6 +1125,7 @@ WHERE row_num <= 3;
 This is a business operation, not just a standalone UPDATE statement.
 
 Input:
+
 ```text
 issue_id
 actor_id
@@ -1095,6 +1133,7 @@ new_status
 ```
 
 Required sequence:
+
 ```text
 BEGIN
 
@@ -1114,6 +1153,7 @@ COMMIT
 ```
 
 Audit event specification:
+
 ```text
 event_type = issue.status_changed
 metadata = {
@@ -1123,6 +1163,7 @@ metadata = {
 ```
 
 If anything fails:
+
 ```text
 ROLLBACK
 ```
@@ -1136,6 +1177,7 @@ No partial state may remain in the database.
 Creating an issue with labels must be atomic.
 
 Required sequence:
+
 ```text
 BEGIN
 
@@ -1165,6 +1207,7 @@ If label insertion or audit insertion fails, the issue must not exist.
 Tenant isolation is mandatory.
 
 Organization A must never retrieve Organization B's data across:
+
 ```text
 users
 teams
@@ -1243,6 +1286,7 @@ Run two concurrent status changes against the same issue.
 The implementation must demonstrate that the `FOR UPDATE` transaction prevents inconsistent state.
 
 Test scenario:
+
 ```text
 Transaction A:
     SELECT issue FOR UPDATE
@@ -1278,6 +1322,7 @@ Exact error types may differ between `sqlc`, `Bun`, and `Ent`, but the classifie
 For every implementation, maintain a `PRODUCTIVITY.md`.
 
 Record:
+
 ```text
 setup time
 dependency count
@@ -1292,6 +1337,7 @@ time debugging a failed query
 ```
 
 For every difficult operation, record:
+
 ```text
 Requirement
 Implementation
@@ -1314,23 +1360,23 @@ How easy was IDE navigation?
 
 Every implementation must support:
 
-| Capability | sqlc | Bun | Ent |
-|:---|:---:|:---:|:---:|
-| Basic CRUD | ✓ | ✓ | ✓ |
-| JOIN | ✓ | ✓ | ✓ |
-| LEFT JOIN | ✓ | ✓ | ✓ |
-| N:M Relationships | ✓ | ✓ | ✓ |
-| Aggregation | ✓ | ✓ | ✓ |
-| Dynamic Filters | ✓ | ✓ | ✓ |
-| Pagination | ✓ | ✓ | ✓ |
-| Transactions | ✓ | ✓ | ✓ |
-| Row Locking (`FOR UPDATE`) | ✓ | ✓ | ✓ |
-| Upsert (`ON CONFLICT`) | ✓ | ✓ | ✓ |
-| Batch Insert | ✓ | ✓ | ✓ |
-| JSONB Support | ✓ | ✓ | ✓ |
-| Recursive CTE | ✓ | ✓ | ✓ |
-| Window Functions | ✓ | ✓ | ✓ |
-| Concurrent Update Testing | ✓ | ✓ | ✓ |
+| Capability                   | sqlc | Bun | Ent |
+| :--------------------------- | :--: | :-: | :-: |
+| Basic CRUD                   |  ✓  | ✓ | ✓ |
+| JOIN                         |  ✓  | ✓ | ✓ |
+| LEFT JOIN                    |  ✓  | ✓ | ✓ |
+| N:M Relationships            |  ✓  | ✓ | ✓ |
+| Aggregation                  |  ✓  | ✓ | ✓ |
+| Dynamic Filters              |  ✓  | ✓ | ✓ |
+| Pagination                   |  ✓  | ✓ | ✓ |
+| Transactions                 |  ✓  | ✓ | ✓ |
+| Row Locking (`FOR UPDATE`) |  ✓  | ✓ | ✓ |
+| Upsert (`ON CONFLICT`)     |  ✓  | ✓ | ✓ |
+| Batch Insert                 |  ✓  | ✓ | ✓ |
+| JSONB Support                |  ✓  | ✓ | ✓ |
+| Recursive CTE                |  ✓  | ✓ | ✓ |
+| Window Functions             |  ✓  | ✓ | ✓ |
+| Concurrent Update Testing    |  ✓  | ✓ | ✓ |
 
 *The checkmarks describe required functionality to be tested, NOT an assessment of ease.*
 
@@ -1341,6 +1387,7 @@ Every implementation must support:
 Do not implement everything at once. Follow this phased progression:
 
 ### Phase 1 — Foundation
+
 ```text
 Organization
 User
@@ -1349,6 +1396,7 @@ Project
 ```
 
 ### Phase 2 — Issues
+
 ```text
 CreateIssue
 GetIssueDetails
@@ -1357,6 +1405,7 @@ AssignIssue
 ```
 
 ### Phase 3 — Relationships and Aggregation
+
 ```text
 ListProjectIssues
 CountProjectIssues
@@ -1365,6 +1414,7 @@ ListIssueComments
 ```
 
 ### Phase 4 — Transactions
+
 ```text
 GetIssueForUpdate
 UpdateIssueStatus
@@ -1373,11 +1423,13 @@ ListIssueActivity
 ```
 
 ### Phase 5 — Search
+
 ```text
 SearchIssues
 ```
 
 ### Phase 6 — PostgreSQL-Specific Queries
+
 ```text
 ProjectDashboard
 UserWorkload
@@ -1386,11 +1438,13 @@ RecentIssueRank
 ```
 
 ### Phase 7 — Batch
+
 ```text
 AddLabelsToIssue
 ```
 
 ### Phase 8 — Contract & Integration Tests
+
 ```text
 Tenant isolation
 Rollback

@@ -10,14 +10,14 @@ Comparing different Go database management libraries and approaches (**sqlc**, *
 - [TaskForge Domain](#taskforge-domain)
   - [Entity Relationship Diagram](#entity-relationship-diagram)
   - [Core Models](#core-models)
-- [Architecture & Repository Pattern](#architecture--repository-pattern)
+- [Architecture &amp; Repository Pattern](#architecture--repository-pattern)
   - [High-Level Architecture](#high-level-architecture)
   - [Interaction Flow (API to Database)](#interaction-flow-api-to-database)
   - [Separation of Concerns: DTO vs. Domain vs. Persistence](#separation-of-concerns-dto-vs-domain-vs-persistence)
-  - [Code Blueprint: Service & Repository Implementation](#code-blueprint-service--repository-implementation)
+  - [Code Blueprint: Service &amp; Repository Implementation](#code-blueprint-service--repository-implementation)
 - [Directory Structure](#directory-structure)
 - [Local PostgreSQL Setup](#local-postgresql-setup)
-- [SQLC Setup & Workflow](#sqlc-setup--workflow)
+- [SQLC Setup &amp; Workflow](#sqlc-setup--workflow)
 - [Database Migrations (golang-migrate)](#database-migrations-golang-migrate)
 - [Documentation Links](#documentation-links)
 
@@ -26,6 +26,7 @@ Comparing different Go database management libraries and approaches (**sqlc**, *
 ## Overview
 
 In this repository, we compare the developer experience (DX), maintainability, type safety, performance, and ergonomics of three distinct Go database libraries:
+
 1. **[sqlc](https://sqlc.dev/)**: Generates type-safe Go code from raw SQL queries.
 2. **[Bun](https://bun.uptrace.dev/)**: SQL-first Golang ORM for PostgreSQL, MySQL, and SQLite.
 3. **[Ent](https://entgo.io/)**: An entity framework for Go, based on code generation and graph traversal.
@@ -66,18 +67,18 @@ Team ── Project ── Issue ── IssueLabel ── Label
 
 The domain contains exactly **10 database entities**:
 
-| # | Model | Purpose |
-|:---:|:---|:---|
-| 1 | `Organization` | Multi-tenant root account |
-| 2 | `User` | People belonging to an organization |
-| 3 | `Team` | Functional teams within an organization |
-| 4 | `TeamMember` | Many-to-many (`N:M`) mapping between `User` and `Team` with role |
-| 5 | `Project` | Work project owned by a `Team` |
-| 6 | `Issue` | Core work item with status, priority, estimates, and parent/child hierarchy |
-| 7 | `Label` | Organization-scoped tags for categorizing issues |
-| 8 | `IssueLabel` | Many-to-many (`N:M`) relationship linking `Issue` and `Label` |
-| 9 | `Comment` | User comments posted on issues |
-| 10 | `AuditEvent` | Append-only history and activity log for issues and organizations |
+| # | Model            | Purpose                                                                     |
+| :-: | :--------------- | :-------------------------------------------------------------------------- |
+| 1 | `Organization` | Multi-tenant root account                                                   |
+| 2 | `User`         | People belonging to an organization                                         |
+| 3 | `Team`         | Functional teams within an organization                                     |
+| 4 | `TeamMember`   | Many-to-many (`N:M`) mapping between `User` and `Team` with role      |
+| 5 | `Project`      | Work project owned by a`Team`                                             |
+| 6 | `Issue`        | Core work item with status, priority, estimates, and parent/child hierarchy |
+| 7 | `Label`        | Organization-scoped tags for categorizing issues                            |
+| 8 | `IssueLabel`   | Many-to-many (`N:M`) relationship linking `Issue` and `Label`         |
+| 9 | `Comment`      | User comments posted on issues                                              |
+| 10 | `AuditEvent`   | Append-only history and activity log for issues and organizations           |
 
 For full specification and constraints, see [TaskForge Database DX Requirements](./TaskForge-Database-DX-Requirements.md).
 
@@ -183,6 +184,7 @@ Database / sqlc Model
 Even when fields look identical initially, their responsibilities and lifecycle boundaries remain distinct:
 
 #### 1. API Request DTO
+
 ```go
 type CreateOrganizationRequest struct {
     Name string `json:"name"`
@@ -191,6 +193,7 @@ type CreateOrganizationRequest struct {
 ```
 
 #### 2. Domain Model
+
 ```go
 type Organization struct {
     ID        uuid.UUID
@@ -201,6 +204,7 @@ type Organization struct {
 ```
 
 #### 3. SQLC Generated Model
+
 ```go
 type Organization struct {
     ID        uuid.UUID
@@ -436,11 +440,13 @@ taskforge/
 Follow these steps to run PostgreSQL 17 locally with Docker and Colima (on macOS):
 
 ### 1. Start Colima (if on macOS)
+
 ```bash
 colima start
 ```
 
 ### 2. Start PostgreSQL 17 Container
+
 ```bash
 docker run -d \
   --name taskforge-postgres \
@@ -454,30 +460,38 @@ docker run -d \
 ```
 
 ### 3. Verify Container Status
+
 Check if the container is running:
+
 ```bash
 docker ps
 ```
 
 Verify connection readiness:
+
 ```bash
 docker exec -it taskforge-postgres \
   pg_isready -U taskforge -d taskforge
 ```
 
 *Expected output:*
+
 ```text
 /var/run/postgresql:5432 - accepting connections
 ```
 
 ### 4. Connection String
+
 Go applications and migration tools connect via:
+
 ```text
 postgres://taskforge:taskforge@localhost:5432/taskforge?sslmode=disable
 ```
 
 ### 5. Reset Database
+
 To completely wipe the database and recreate it fresh:
+
 ```bash
 docker rm -f taskforge-postgres
 docker volume rm taskforge-postgres-data
@@ -493,11 +507,13 @@ docker run -d \
 ```
 
 ### 6. Connect via Local PSQL
+
 ```bash
 psql "postgres://taskforge:taskforge@localhost:5432/taskforge?sslmode=disable"
 ```
 
 ### 7. Connect via Container PSQL
+
 ```bash
 docker exec -it taskforge-postgres \
   psql -U taskforge -d taskforge
@@ -508,13 +524,16 @@ docker exec -it taskforge-postgres \
 ## SQLC Setup & Workflow
 
 ### 1. Install CLI Tools
+
 ```bash
 brew install sqlc
 sqlc version
 ```
 
 ### 2. Install Go Dependencies
+
 From within the `sqlc` module directory:
+
 ```bash
 cd sqlc
 go get github.com/jackc/pgx/v5
@@ -522,23 +541,28 @@ go get github.com/jackc/pgx/v5/pgxpool
 ```
 
 ### 3. Install Migration CLI (`golang-migrate`)
+
 ```bash
 brew install golang-migrate
 ```
 
 ### 4. Configure `sqlc.yaml` & Generate Code
+
 Run code generation:
+
 ```bash
 sqlc generate
 ```
 
 In `sqlc.yaml`, define:
+
 - `schema`: Path pointing to the `db/migrations` folder containing DDL schema files.
 - `queries`: Path pointing to SQL query files per model (`db/queries/*.sql`).
 
 All annotated queries are compiled into type-safe Go methods and constants inside the generated package.
 
 ### 5. SQLC Internal Directory Layout
+
 ```text
 sqlc/
 ├── db/
@@ -565,6 +589,7 @@ migrate \
 ```
 
 To roll back migrations:
+
 ```bash
 migrate \
   -path db/migrations \
@@ -572,9 +597,25 @@ migrate \
   down
 ```
 
+
+## Bob
+
+Bob is a new framework which we will try to understand for our project's use cases.
+
+
+`export PSQL_DSN='postgres://taskforge@localhost:5432/taskforge?sslmode=disable'`
+
+In `/bob` directory:
+
+```
+go run github.com/stephenafamo/bob/gen/bobgen-psql@latest \
+  -c ./bobgen.yaml
+```
+
+
 ---
 
 ## Documentation Links
 
 - **[TaskForge Database DX Requirements](./TaskForge-Database-DX-Requirements.md)** — Detailed specification covering 10 tables, required indexes, seed data, 26 feature requirements, transactions, analytical queries, CTEs, window functions, and contract tests.
-- **[Feedback & Architectural Exploration](./Feedback.md)** — Real-world observations, developer experience insights, OOP design challenges (ISP/SoC), and the Repository pattern solution for SQLC.
+- **[Feedback &amp; Architectural Exploration](./Feedback.md)** — Real-world observations, developer experience insights, OOP design challenges (ISP/SoC), and the Repository pattern solution for SQLC.
