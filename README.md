@@ -30,6 +30,7 @@ In this repository, we compare the developer experience (DX), maintainability, t
 1. **[sqlc](https://sqlc.dev/)**: Generates type-safe Go code from raw SQL queries.
 2. **[Bun](https://bun.uptrace.dev/)**: SQL-first Golang ORM for PostgreSQL, MySQL, and SQLite.
 3. **[Ent](https://entgo.io/)**: An entity framework for Go, based on code generation and graph traversal.
+4. **[Bob](https://github.com/stephenafamo/bob)**: A SQL-first query builder and code generator that bridges the gap between raw SQL and ORMs.
 
 We implement the exact same set of realistic business requirements across all three libraries against PostgreSQL 17 to evaluate how each abstraction performs in real-world scenarios.
 
@@ -598,20 +599,27 @@ migrate \
 ```
 
 
-## Bob
+## Bob Setup & Workflow
 
-Bob is a new framework which we will try to understand for our project's use cases.
+**Bob** is a "SQL-first" framework that generates Go code by inspecting your existing database schema. Unlike `sqlc` (which generates code from queries you write), Bob generates code based on your tables and relationships.
 
+### What does Bob generate?
 
-`export PSQL_DSN='postgres://taskforge@localhost:5432/taskforge?sslmode=disable'`
+In simple English, Bob generates:
+- **Structs**: A Go struct for every table in your database (e.g., `Organization`, `User`).
+- **Query Builders**: Type-safe methods to build `SELECT`, `INSERT`, `UPDATE`, and `DELETE` queries without writing raw SQL strings.
+- **Relationship Helpers**: Automatic logic to handle "joins" and "preloading" (e.g., fetching a `User` along with their `Organization`) based on your Foreign Keys.
+- **Hooks**: Entry points to run custom logic before or after database operations (e.g., "Set `updated_at` before saving").
 
-In `/bob` directory:
+### Code Generation Command
 
-```
-go run github.com/stephenafamo/bob/gen/bobgen-psql@latest \
-  -c ./bobgen.yaml
-```
+1. Set your connection string:
+   `export PSQL_DSN='postgres://taskforge:taskforge@localhost:5432/taskforge?sslmode=disable'`
 
+2. Run the generator from the `/bob` directory:
+   ```bash
+   go run github.com/stephenafamo/bob/gen/bobgen-psql@latest -c ./bobgen.yaml
+   ```
 
 ---
 

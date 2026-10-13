@@ -5,6 +5,16 @@ psql:
 
 plugins_preset: all
 
+types:
+  uuid.UUID:
+    imports:
+      - '"github.com/google/uuid"'
+
+replacements:
+  - match:
+      type: "uuid.UUID"
+    replace: "uuid.UUID"
+
 plugins:
   models:
     pkgname: models
