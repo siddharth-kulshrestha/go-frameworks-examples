@@ -621,6 +621,34 @@ In simple English, Bob generates:
    go run github.com/stephenafamo/bob/gen/bobgen-psql@latest -c ./bobgen.yaml
    ```
 
+### Handling Custom Go Types (e.g., UUIDs) in Code Generation
+
+When using code-generation frameworks like Bob (or `sqlc`), database types such as PostgreSQL `UUID` often default to library-specific types (e.g., `github.com/gofrs/uuid/v5`) instead of standard project types (e.g., `github.com/google/uuid`). 
+
+To align generated models with your domain models and avoid manual type-casting across layers:
+1. **Register Custom Types**: Define the target Go type and its required import path in the generator's configuration file (`bobgen.yaml`).
+2. **Apply Type Replacements**: Map database-level types or generated types directly to your preferred Go library type using the `replacements` block.
+
+Example configuration in `bobgen.yaml`:
+```yaml
+types:
+  uuid.UUID:
+    imports:
+      - '"github.com/google/uuid"'
+
+replacements:
+  - match:
+      type: "uuid.UUID"
+    replace: "uuid.UUID"
+```
+
+#### What do `types` and `replacements` mean in simple English?
+- **`types`**: This tells the generator: *"Hey, whenever you see or use `uuid.UUID`, make sure to import `github.com/google/uuid` at the top of the generated file."*
+- **`replacements`**: This tells the generator: *"Search through the columns/types detected from the database (`match`), and wherever it would normally use its default library type, substitute (`replace`) it with our preferred type (`uuid.UUID`)."*
+- **Why are `uuid.UUID` used in both `match` and `replace`?** 
+  - **`match: type: "uuid.UUID"`** is the target we are looking for in the generator's internal type mapping.
+  - **`replace: "uuid.UUID"`** is what we want to swap it with. Keeping them both as `uuid.UUID` ensures that we are explicitly targeting the UUID type and confirming that we want to keep/enforce `uuid.UUID` (from our custom import) instead of the framework's default fallback type.
+
 ---
 
 ## Documentation Links
