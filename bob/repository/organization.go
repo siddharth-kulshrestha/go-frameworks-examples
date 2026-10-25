@@ -2,16 +2,16 @@ package repository
 
 import (
 	"context"
-	"uuid"
 
 	"github.com/aarondl/opt/omit"
+	"github.com/google/uuid"
 	"github.com/siddharth-kulshrestha/taskforge/bob/models"
 	dm "github.com/siddharth-kulshrestha/taskforge/domain/models"
 	"github.com/stephenafamo/bob"
 )
 
 type Organization struct {
-	db *bob.Executor
+	db bob.Executor
 }
 
 func (o *Organization) Create(ctx context.Context, org *dm.Organization) error {
