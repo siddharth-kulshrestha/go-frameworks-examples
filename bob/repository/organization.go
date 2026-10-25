@@ -14,7 +14,11 @@ type Organization struct {
 	db bob.Executor
 }
 
-func (o *Organization) Create(ctx context.Context, org *dm.Organization) error {
+func NewOrganizationRepository(db bob.Executor) *Organization {
+	return &Organization{db: db}
+}
+
+func (o *Organization) Create(ctx context.Context, org *dm.Organization) (*dm.Organization, error) {
 	setter := &models.OrganizationSetter{
 		ID:        omit.From(org.ID),
 		Name:      omit.From(org.Name),
@@ -24,14 +28,14 @@ func (o *Organization) Create(ctx context.Context, org *dm.Organization) error {
 
 	row, err := models.Organizations.Insert(setter).One(ctx, o.db)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Update the domain model with DB Generated values
 	org.ID = row.ID
 	org.CreatedAt = row.CreatedAt
 
-	return nil
+	return org, nil
 
 }
 
