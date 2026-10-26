@@ -1,0 +1,7 @@
+# Fiber v3 sample only; do not use the Fiber v2 generator target.
+# schema: https://raw.githubusercontent.com/oapi-codegen/oapi-codegen/v2.8.0/configuration-schema.json
+package: gen
+output: api/gen/taskforge.gen.go
+generate:
+  fiber-v3-server: true
+  models: true

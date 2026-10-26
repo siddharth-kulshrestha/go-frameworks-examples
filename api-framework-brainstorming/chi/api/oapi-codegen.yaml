@@ -1,0 +1,7 @@
+# Pin generator version in the selected example module/tool manifest.
+# schema: https://raw.githubusercontent.com/oapi-codegen/oapi-codegen/v2.8.0/configuration-schema.json
+package: gen
+output: api/gen/taskforge.gen.go
+generate:
+  chi-server: true
+  models: true

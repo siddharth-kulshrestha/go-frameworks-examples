@@ -1,0 +1,53 @@
+openapi: 3.0.3
+info:
+  title: TaskForge API sample
+  version: 1.0.0
+servers:
+  - url: /api/v1
+paths:
+  /organizations/{organizationID}:
+    get:
+      operationId: getOrganization
+      parameters:
+        - in: path
+          name: organizationID
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Organization found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Organization' }
+        '400': { description: Invalid identifier }
+        '404': { description: Organization not found }
+  /organizations:
+    post:
+      operationId: createOrganization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateOrganization' }
+      responses:
+        '201':
+          description: Organization created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Organization' }
+        '409': { description: Slug already exists }
+components:
+  schemas:
+    CreateOrganization:
+      type: object
+      required: [name, slug]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        slug: { type: string, pattern: '^[a-z0-9-]+$' }
+    Organization:
+      type: object
+      required: [id, name, slug]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
